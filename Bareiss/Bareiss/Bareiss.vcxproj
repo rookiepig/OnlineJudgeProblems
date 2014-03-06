@@ -11,9 +11,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{61E34A04-FB93-4CD4-A5A2-7ADF4CAE9F75}</ProjectGuid>
+    <ProjectGuid>{1BDE0063-4BB1-4B83-97A6-1352409570D9}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>POJ1753</RootNamespace>
+    <RootNamespace>Bareiss</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -74,7 +74,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="bfs.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
