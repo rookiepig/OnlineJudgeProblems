@@ -1,165 +1,313 @@
 ///////////////////////////////////////////////////////
 // File: main.cpp
-// Desc: POJ2965 The Pilots Brothers' refrigerator
+// Desc: POJ1753 -- gaussian elimination
 //
 // Author: Zhang Kang
-// Date: 2014/03/03
+// Date: 2014/03/06
 ///////////////////////////////////////////////////////
-#include<cstdio>
-#include<cstdlib>
+
+#include<iostream>
+#include<fstream>
+#include<string>
+#include<vector>
 #include<cstring>
-#include<queue>
-#include<ctime>
-
+#include<cstdlib>
+#include<iomanip>
 using namespace std;
-#define B_HEI 4
-#define B_WID 4
-#define MAX_STATE 65537
 
-// state and mask
-typedef unsigned int uint;
+// #define _DETAIL
 
-// print board
-void PrintBrd( char brd[ B_HEI ][ B_WID + 1 ] )
+// lcm -- lowest common multple
+int lcm( int x, int y )
 {
-	for( int y = 0; y < B_HEI; y ++ ) {
-		printf( "%s\n", brd[ y ] );
+	while( y != 0 ) {
+		int t = x % y;
+		x = y;
+		y = t;
 	}
+	return x;
 }
-// convert board to int
-int BrdToInt( char brd[ B_HEI ][ B_WID + 1 ] )
+
+// print mat
+void PrintMat( int* A, const int m, const int n )
 {
-	uint s = 0x0000;
-	uint m = 0x0001;
-	for( int y = 0; y < B_HEI; y ++ ) {
-		for( int x = 0; x < B_WID; x ++ ) {
-			if( brd[ y ][ x ] == '+' ) {
-				s |= m;
-			}
-			m <<= 1;
+	for( int i = 0; i < m; i ++ ) {
+		for( int j = 0; j < n; j ++ ) {
+			cout << setw( 6 ) << A[ i * n + j ];
 		}
+		cout << endl;
 	}
-	return s;
 }
-// convert int to board
-void IntToBrd( uint s, char brd[ B_HEI ][ B_WID + 1 ] )
+
+// swap two rows
+void SwapRow( int* A, const int n, const int k, const int iMax )
 {
-	uint m = 0x0001;
-	for( int y = 0; y < B_HEI; y ++ ) {
-		for( int x = 0; x < B_WID; x ++ ) {
-			if( s & m ) {
-				brd[ y ][ x ] = '+';
-			} else {
-				brd[ y ][ x ] = '-';
-			}
-			m <<= 1;
+	int* pK = A + k * n;
+	int* pI = A + iMax * n;
+	for( int j = 0; j < n; j ++ ) {
+		int tmp = pK[ j ];
+		pK[ j ] = pI[ j ];
+		pI[ j ] = tmp;
+	}
+}
+// Integer Gaussian Elimiation
+void GaussElimInt( int* A, const int m, const int n )
+{
+	for( int k = 0; k < m; k ++ ) {
+		// find pivot row (partial pivoting)
+		int iMax = k;
+		int aMax = A[ k * n + k ];
+		for( int i = k; i < m; i ++ ) {
+			if( abs( A[ i * n + k ] ) > aMax ) {
+				aMax = abs( A[ i * n + k ] );
+				iMax = i;
+			} 
 		}
-	}
-}
-// generate flip mask
-void GenFlipMask( uint flip[ B_HEI ][ B_WID ] )
-{
-	for( int y = 0; y < B_HEI; y ++ ) {
-		for( int x = 0; x < B_WID; x ++ ) {
-			char brd[ B_HEI ][ B_WID + 1 ] = { "----", "----", "----", "----"};
-			brd[ y ][ x ] = '+';
-			for( int t = 0; t < B_HEI; t ++ ) {
-				brd[ t ][ x ] = '+';
+		if( aMax != 0 ) {
+			// aMax == 0 --> no need to elim
+
+			// swap pivot row with current row
+			SwapRow( A, n, k, iMax );
+#ifdef _DETAIL
+			PrintMat( A, m, n );
+#endif
+			// eliminate remaining row
+			for( int i = k + 1; i < m; i ++ ) {
+				if( A[ i * n + k ] != 0 ) {
+					int l = lcm( A[ i * n + k ], A[ k * n + k ] );
+					int multiK = A[ i * n + k ] / l;
+					int multiI = A[ k * n + k ] / l;
+
+					for( int j = k; j < n; j ++ ) {
+						A[ i * n + j ] = ( ( A[ i * n + j ] * multiI ) % 2 -
+							( A[ k * n + j ] * multiK ) % 2 + 2 ) % 2;
+					}
+					// set bottom to zero
+					// A[ i * n + k ] = 0;
+				}
 			}
-			for( int t = 0; t < B_WID; t ++ ) {
-				brd[ y ][ t ] = '+';
-			}
-			flip[ y ][ x ] = BrdToInt( brd );
-#ifdef _DEBUG
-			//PrintBrd( brd );
-			//printf( "%x\n", flip[ y ][ x ] );
+
+#ifdef _DETAIL
+			PrintMat( A, m, n );
 #endif
 		}
 	}
 }
-// one move [ i, j ]
-//typedef struct Move {
-//	int i;
-//	int j;
-//} Move;
 
-// board state
-typedef struct State {
-	uint s;
-	int round;
-	int mv[ B_HEI * B_WID ];
-} State;
+// is feasible (A is augment matrix, last col is b)
+bool IsFeasible( int* A, int m, int n )
+{
+	for( int i = m - 1; i >= 0; i -- ) {
+		int* pA = A + i * n;
+		for( int j = 0; j < n - 1; j ++ ) {
+			if( pA[ j ] != 0 ) {
+				return true;
+			}
+		}
+		if( pA[ n - 1 ] != 0 ) {
+			return false;
+		}
+	}
+}
 
+// set non-free vriable flag
+void SetNonFreeVar( int* A, int m, int n, int* xFlag )
+{
+	for( int i = 0; i < m; i ++ ) {
+		int* pA = A + i * n;
+		for( int j = 0; j < n - 1; j ++ ) {
+			if( pA[ j ] != 0 ) {
+				xFlag[ j ] = 1;
+				break;
+			}
+		}
+	}
+}
+
+void BackSub( int* A, int m, int n, int*  xSol )
+{
+	// m == n -1
+	int varNum = n - 1;
+	for( int i = varNum - 1; i >= 0; i -- ) {
+		int* pA = A + i * n;
+		if( pA[ i ] == 0 ) {
+			// free variable no need to solve
+			continue;;
+		}
+		int sum = pA[ n - 1 ] % 2;
+		for( int j = varNum  - 1; j > i; j --  ) {
+			sum = ( sum -  ( pA[ j ] * xSol[ j ] ) % 2 + 2 ) % 2;
+		}
+		xSol[ i ] = ( sum / pA[ i ] ) % 2;
+	}
+}
+
+// global var to record solution
+int  minStep = 1e10;
+int* minSol = 0;
+void EnumSol( int* A, int m, int n, int* nonFree, int nfNum, int* xSol )
+{
+	if( nfNum == 0 ) {
+		// no free variable --> back sub
+		BackSub( A, m, n, xSol );
+		// stat result
+		int curStep = 0;
+		for( int i = 0; i < n - 1; i ++ ) {
+			if( xSol[ i ] ) {
+				curStep ++;
+			}
+		}
+		if( curStep < minStep ) {
+			// record new min sol
+			minStep = curStep;
+			memcpy( minSol, xSol, ( n - 1 ) * sizeof( int ) );
+		}
+	} else {
+		// enumarate all non free var
+		for( int i = 0; i < n - 1; i ++ ) {
+			if( nonFree[ i ] == 0 ) {
+				nonFree[ i ] = 1;
+				xSol[ i ] = 0; 
+				EnumSol( A, m, n, nonFree, nfNum - 1, xSol );
+				xSol[ i ] = 1; 
+				EnumSol( A, m, n, nonFree, nfNum - 1, xSol );
+				nonFree[ i ] = 0;
+			}
+		}
+	}
+}
+// get solution
+void GetSolution( int* A, int m, int n, bool& bFease, int* xSol )
+{
+	bFease = IsFeasible( A, m, n );
+	if( bFease ) {
+		int varNum = n - 1;
+		int* nonFree = new int[ varNum ] ();
+		SetNonFreeVar( A, m, n, nonFree );
+		bool multiSol = false;
+		for( int i = 0; i < varNum; i ++ ) {
+			if( nonFree[ i ] == 0 ) {
+				multiSol = true;
+				break;
+			}
+		}
+		if( multiSol ) {
+			// multiple solution
+#ifdef _DEBUG
+			cout << "Multi Solution" << endl;
+			PrintMat( A, m, n );
+#endif
+			// get non free num
+			int nfNum = 0;
+			for( int i = 0; i < varNum; i ++ ) {
+				if( nonFree[ i ] == 0 ) {
+					nfNum ++;
+				}
+			}
+			EnumSol( A, m, n, nonFree, nfNum, xSol );
+		} else{
+			// single solution
+			BackSub( A, m, n, xSol );
+			// stat result
+			int curStep = 0;
+			for( int i = 0; i < n - 1; i ++ ) {
+				if( xSol[ i ] ) {
+					curStep ++;
+				}
+			}
+			if( curStep < minStep ) {
+				// record new min sol
+				minStep = curStep;
+				memcpy( minSol, xSol, ( n - 1 ) * sizeof( int ) );
+			}
+		}
+
+		delete [] nonFree;
+	}
+}
 int main( void )
 {
-	char brd[ B_HEI ][ B_WID + 1 ] = { "", "", "", "" };
-	uint flip[ B_HEI ][ B_WID ];
-	// input checssboard
-	for( int i = 0 ; i < B_HEI; i ++ ) {
-		scanf( "%s", brd[ i ] );
+#ifdef _DEBUG
+	// redirect file stream to cin
+	fstream fIn( "in.txt" );
+	streambuf* cinBuf = cin.rdbuf( );
+	cin.rdbuf( fIn.rdbuf() );
+#endif
+	// input board
+	vector<string> brd;
+	string buf;
+	int lineNum = 0;
+	const int BRD_HEI = 4;
+	while( cin >> buf ) {
+		brd.push_back( buf );
+		lineNum ++;
+		if( lineNum >= BRD_HEI ) {
+			break;
+		}
 	}
-#ifdef _DEBUG
-	time_t st = time( NULL );
-#endif
-	uint s = BrdToInt( brd );
-#ifdef _DEBUG
-	printf( "%x\n", s );
-#endif
-	// generate all flip mask
-	GenFlipMask( flip );
-	// BFS search
-	int chkFlag[ MAX_STATE ];
-	memset( chkFlag, 0, MAX_STATE * sizeof( int ) );
-	queue<State> bfsQ;
-	State curS;
-	curS.s = s;
-	curS.round = 0;
-	memset( curS.mv, 0, B_HEI * B_WID * sizeof( int ) );
-	bfsQ.push( curS );
-	while( !bfsQ.empty() ) {
-		curS = bfsQ.front( );
-		bfsQ.pop();
-		if( curS.s == 0x0000  ) {
-			// succeed
-			printf( "%d\n", curS.round );
-			for( int t = 0;  t < B_WID * B_HEI; t ++ ) {
-				if( curS.mv[ t ] ) {
-					printf( "%d %d\n", t / B_WID + 1, t % B_WID + 1 );
-				}
-			}
-			return 0;
-		} else {
-			if( !chkFlag[ curS.s ] ) {
-				// not accessed before
-				State old = curS;
-				chkFlag[ curS.s ] = 1;
-				for( int y = 0; y < B_HEI; y ++ ) {
-					for( int x = 0; x < B_WID; x ++ ) {
-						// only add non-fliped pos
-						if( ! old.mv[ y * B_WID + x ] ) {
-							// add all possible flips
-							curS.s = old.s ^ flip[ y ][ x ];
-							if( !chkFlag[ curS.s ] ) {
-								// new move unchcked
-								curS.round = old.round + 1;
-								memcpy( curS.mv, old.mv, B_HEI * B_WID * sizeof( int ) );
-								curS.mv[ y * B_WID + x ] = 1;
-								bfsQ.push( curS );
-							}
-						}
-					}
-				}
-			}
+	// init augment matrix
+	int brdWid = buf.length();
+	int brdHei = BRD_HEI;
+	int n = brdHei * brdWid;
+	// value initialization
+	int* A = new int[ n * ( n + 1 ) ] ();
+	for( int i = 0; i < n; i ++ ) {
+		int* pA = A + i * ( n + 1 );
+		int iR = i / brdWid;
+		// set coefficient
+		pA[ i ] = 1;
+		// same row
+		int curRow = i / brdWid;
+		for( int j = 0; j < brdWid; j ++ ) {
+			pA[ curRow * brdWid + j ] = 1;
+		}
+		// same col
+		int curCol = i % brdWid;
+		for( int j = 0; j < brdHei; j ++ ) {
+			pA[ j * brdWid + curCol ] = 1;
+		}
+		// set b
+		if( brd[ i / brdWid ][ i % brdWid ] == '+' ) {
+			pA[ n ] = 1;
 		}
 	}
 
-	printf( "Impossible\n" );
 #ifdef _DEBUG
-	s  ^= flip[ 0 ][ 0 ];
-	IntToBrd( s, brd );
-	PrintBrd( brd );
-	time_t ed = time( NULL );
-	printf( "time %d\n", ed - st );
+	cout << "A: \n";
+	PrintMat( A, n, n + 1 );
 #endif
+	// Gauss Elimination
+	GaussElimInt( A, n, n + 1 );
+
+	// Get solution
+	minSol = new int [ n ] ();
+
+	int* aSol = new int [ n ] ();
+	bool aFease = false;
+	GetSolution( A, n, n + 1, aFease, aSol );
+	int minA = 0;
+	for( int i = 0; i < n; i ++ ) {
+		minA += minSol[ i ];
+	}
+
+	if( aFease  ) {
+		cout << minStep << endl;
+		for( int i = 0; i < n; i ++ ) {
+			if( minSol[ i ] ) {
+				cout << i / brdWid + 1 << " " << i % brdWid + 1 << endl;
+			}
+		}
+	} else {
+		cout << "Impossible" << endl;
+	}
+
+#ifdef _DEBUG
+	cout << "aFease: " << aFease << " minA: " << minA << endl;
+	// restore cin buf
+	cin.rdbuf( cinBuf );
+#endif
+
+	delete [] A;
+	delete [] aSol;
 	return 0;
 }
