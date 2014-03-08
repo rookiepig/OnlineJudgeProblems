@@ -130,11 +130,50 @@ void BackSub( int* A, int m, int n, int*  xSol )
 	int varNum = n - 1;
 	for( int i = varNum - 1; i >= 0; i -- ) {
 		int* pA = A + i * n;
-		int sum = pA[ n ] % 2;
+		if( pA[ i ] == 0 ) {
+			// free variable no need to solve
+			continue;;
+		}
+		int sum = pA[ n - 1 ] % 2;
 		for( int j = varNum  - 1; j > i; j --  ) {
 			sum = ( sum -  ( pA[ j ] * xSol[ j ] ) % 2 + 2 ) % 2;
 		}
 		xSol[ i ] = ( sum / pA[ i ] ) % 2;
+	}
+}
+
+// global var to record solution
+int  minStep = 1e10;
+int* minSol = 0;
+void EnumSol( int* A, int m, int n, int* nonFree, int nfNum, int* xSol )
+{
+	if( nfNum == 0 ) {
+		// no free variable --> back sub
+		BackSub( A, m, n, xSol );
+		// stat result
+		int curStep = 0;
+		for( int i = 0; i < n - 1; i ++ ) {
+			if( xSol[ i ] ) {
+				curStep ++;
+			}
+		}
+		if( curStep < minStep ) {
+			// record new min sol
+			minStep = curStep;
+			memcpy( minSol, xSol, ( n - 1 ) * sizeof( int ) );
+		}
+	} else {
+		// enumarate all non free var
+		for( int i = 0; i < n - 1; i ++ ) {
+			if( nonFree[ i ] == 0 ) {
+				nonFree[ i ] = 1;
+				xSol[ i ] = 0; 
+				EnumSol( A, m, n, nonFree, nfNum - 1, xSol );
+				xSol[ i ] = 1; 
+				EnumSol( A, m, n, nonFree, nfNum - 1, xSol );
+				nonFree[ i ] = 0;
+			}
+		}
 	}
 }
 // get solution
@@ -154,10 +193,33 @@ void GetSolution( int* A, int m, int n, bool& bFease, int* xSol )
 		}
 		if( multiSol ) {
 			// multiple solution
+#ifdef _DEBUG
 			cout << "Multi Solution" << endl;
+			PrintMat( A, m, n );
+#endif
+			// get non free num
+			int nfNum = 0;
+			for( int i = 0; i < varNum; i ++ ) {
+				if( nonFree[ i ] == 0 ) {
+					nfNum ++;
+				}
+			}
+			EnumSol( A, m, n, nonFree, nfNum, xSol );
 		} else{
 			// single solution
 			BackSub( A, m, n, xSol );
+			// stat result
+			int curStep = 0;
+			for( int i = 0; i < n - 1; i ++ ) {
+				if( xSol[ i ] ) {
+					curStep ++;
+				}
+			}
+			if( curStep < minStep ) {
+				// record new min sol
+				minStep = curStep;
+				memcpy( minSol, xSol, ( n - 1 ) * sizeof( int ) );
+			}
 		}
 
 		delete [] nonFree;
@@ -177,11 +239,11 @@ int main( void )
 	int lineNum = 0;
 	const int BRD_HEI = 4;
 	while( cin >> buf ) {
+		brd.push_back( buf );
+		lineNum ++;
 		if( lineNum >= BRD_HEI ) {
 			break;
 		}
-		brd.push_back( buf );
-		lineNum ++;
 	}
 	// init augment matrix
 	int brdWid = buf.length();
@@ -227,34 +289,50 @@ int main( void )
 			pB[ n ] = 0;
 		}
 	}
+
+#ifdef _DEBUG
+	cout << "A: \n";
+	PrintMat( A, n, n + 1 );
+	cout << "B: \n";
+	PrintMat( B, n, n + 1 );
+#endif
 	// Gauss Elimination
 	GaussElimInt( A, n, n + 1 );
 	GaussElimInt( B, n, n + 1 );
 
 	// Get solution
+	minSol = new int [ n ] ();
+
 	int* aSol = new int [ n ] ();
-	bool aFease;
+	bool aFease = false;
 	GetSolution( A, n, n + 1, aFease, aSol );
 	int minA = 0;
 	for( int i = 0; i < n; i ++ ) {
-		minA += aSol[ i ];
+		minA += minSol[ i ];
 	}
 	
 	int* bSol = new int [ n ] ();
-	bool bFease;
+	bool bFease = false;
 	GetSolution( B, n, n + 1, bFease, bSol );
 	int minB = 0;
 	for( int i = 0; i < n; i ++ ) {
-		minB += bSol[ i ];
+		minB += minSol[ i ];
 	}
 
+	if( aFease || bFease ) {
+		cout << minStep << endl;
+	} else {
+		cout << "Impossible" << endl;
+	}
+	
 #ifdef _DEBUG
+	for( int i = 0; i < n; i ++ ) {
+		if( minSol[ i ] ) {
+			cout << i / brdWid + 1 << " " << i % brdWid + 1 << endl;
+		}
+	}
 	cout << "aFease: " << aFease << " minA: " << minA << endl;
 	cout << "bFease: " << bFease << " minB: " << minB << endl;
-	cout << "B: \n";
-	PrintMat( B, n, n + 1 );
-	cout << "After GE:\n";
-	PrintMat( A, n, n + 1 );
 	// restore cin buf
 	cin.rdbuf( cinBuf );
 #endif

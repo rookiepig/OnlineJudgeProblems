@@ -87,7 +87,7 @@ void GenFlipMask( uint flip[ B_HEI ][ B_WID ] )
 typedef struct State {
 	uint s;
 	int round;
-	int mv[ 10 ];
+	int mv[ B_HEI * B_WID ];
 } State;
 
 int main( void )
@@ -114,6 +114,7 @@ int main( void )
 	State curS;
 	curS.s = s;
 	curS.round = 0;
+	memset( curS.mv, 0, B_HEI * B_WID * sizeof( int ) );
 	bfsQ.push( curS );
 	while( !bfsQ.empty() ) {
 		curS = bfsQ.front( );
@@ -121,8 +122,10 @@ int main( void )
 		if( curS.s == 0x0000  ) {
 			// succeed
 			printf( "%d\n", curS.round );
-			for( int t = 0;  t < curS.round; t ++ ) {
-				printf( "%d %d\n", curS.mv[ t ] / B_WID + 1, curS.mv[ t ] % B_WID + 1 );
+			for( int t = 0;  t < B_WID * B_HEI; t ++ ) {
+				if( curS.mv[ t ] ) {
+					printf( "%d %d\n", t / B_WID + 1, t % B_WID + 1 );
+				}
 			}
 			return 0;
 		} else {
@@ -132,13 +135,17 @@ int main( void )
 				chkFlag[ curS.s ] = 1;
 				for( int y = 0; y < B_HEI; y ++ ) {
 					for( int x = 0; x < B_WID; x ++ ) {
-						// add all possible flips
-						curS.s = old.s ^ flip[ y ][ x ];
-						if( !chkFlag[ curS.s ] ) {
-							// new move unchcked
-							curS.round = old.round + 1;
-							curS.mv[ curS.round - 1 ] = y * B_WID + x;
-							bfsQ.push( curS );
+						// only add non-fliped pos
+						if( ! old.mv[ y * B_WID + x ] ) {
+							// add all possible flips
+							curS.s = old.s ^ flip[ y ][ x ];
+							if( !chkFlag[ curS.s ] ) {
+								// new move unchcked
+								curS.round = old.round + 1;
+								memcpy( curS.mv, old.mv, B_HEI * B_WID * sizeof( int ) );
+								curS.mv[ y * B_WID + x ] = 1;
+								bfsQ.push( curS );
+							}
 						}
 					}
 				}
