@@ -79,8 +79,8 @@ void GaussElimInt( int* A, const int m, const int n )
 					int multiI = A[ k * n + k ] / l;
 
 					for( int j = k; j < n; j ++ ) {
-						A[ i * n + j ] = ( ( A[ i * n + j ] * multiI ) % 2 -
-							( A[ k * n + j ] * multiK ) % 2 + 2 ) % 2;
+						A[ i * n + j ] = ( ( A[ i * n + j ] * multiI )  -
+							( A[ k * n + j ] * multiK )  );
 					}
 					// set bottom to zero
 					// A[ i * n + k ] = 0;
@@ -97,17 +97,24 @@ void GaussElimInt( int* A, const int m, const int n )
 // is feasible (A is augment matrix, last col is b)
 bool IsFeasible( int* A, int m, int n )
 {
-	for( int i = m - 1; i >= 0; i -- ) {
+  int rank = m;
+  int flag = 1;
+	for( int i = m - 1; i >= 0 && flag; i -- ) {
 		int* pA = A + i * n;
 		for( int j = 0; j < n - 1; j ++ ) {
 			if( pA[ j ] != 0 ) {
-				return true;
+        flag = 0;
+        break;
 			}
 		}
-		if( pA[ n - 1 ] != 0 ) {
-			return false;
-		}
+    rank--;
 	}
+  if (rank >= n) {
+    return true;
+  }
+  else {
+    return false;
+  }
 }
 
 // set non-free vriable flag
