@@ -1,5 +1,5 @@
 # Talk is cheap, show me the code :)
 
-'''cpp
+```cpp
 coding == gaming ? enjoy : practise
-'''
+```
